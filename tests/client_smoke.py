@@ -96,7 +96,18 @@ def check(browser, width, height, mobile, language):
         'Could not load "util".',
         'maps.googleapis.com/maps/api/mapsjs/gen_204?csp_test=true due to access control checks.',
     )
-    app_errors = [error for error in errors if not any(token in error for token in google_maps_frame_noise)]
+    def is_third_party_map_noise(error):
+        if any(token in error for token in google_maps_frame_noise):
+            return True
+        # WebKit reports a third-party Yandex Maps iframe attempting to read
+        # its HTTP localhost parent. This is not an error from the TANEM app.
+        lowered = error.lower()
+        return (browser.browser_type.name == "webkit"
+                and "yandex.ru" in lowered
+                and "accessing a frame" in lowered
+                and "protocols must match" in lowered)
+
+    app_errors = [error for error in errors if not is_third_party_map_noise(error)]
     assert not app_errors, f"JavaScript errors: {app_errors}"
     assert not failed_assets, f"Missing site assets: {failed_assets}"
     context.close()
